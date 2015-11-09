@@ -68,6 +68,73 @@ func NewCloudConfig(contents string) (*CloudConfig, error) {
 	return &cfg, err
 }
 
+func (co *CoreOS) Merge(mergeWith CoreOS) {
+	for _, u := range mergeWith.Units {
+		if unit := co.findUnit(u.Name); unit != nil {
+			unit.Merge(u)
+		} else {
+			co.Units = append(co.Units, u)
+		}
+	}
+}
+
+func (co *CoreOS) findUnit(unitName string) *Unit {
+	for i, u := range co.Units {
+		if u.Name == unitName {
+			return &co.Units[i]
+		}
+	}
+	return nil
+}
+
+func (cc *CloudConfig) Merge(mergeWith *CloudConfig) {
+	for _, key := range mergeWith.SSHAuthorizedKeys {
+		if !cc.sshKeyAlreadyExists(key) {
+			cc.SSHAuthorizedKeys = append(cc.SSHAuthorizedKeys, key)
+		}
+	}
+	for _, user := range mergeWith.Users {
+		if u := cc.findUser(user.Name); u != nil {
+			u.Merge(user)
+		} else {
+			cc.Users = append(cc.Users, user)
+		}
+	}
+	for _, file := range mergeWith.WriteFiles {
+		if !cc.writeFileAlreadyExists(file.Path) {
+			cc.WriteFiles = append(cc.WriteFiles, file)
+		}
+	}
+	cc.CoreOS.Merge(mergeWith.CoreOS)
+}
+
+func (cc *CloudConfig) writeFileAlreadyExists(path string) bool {
+	for _, file := range cc.WriteFiles {
+		if file.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func (cc *CloudConfig) sshKeyAlreadyExists(sshKey string) bool {
+	for _, key := range cc.SSHAuthorizedKeys {
+		if key == sshKey {
+			return true
+		}
+	}
+	return false
+}
+
+func (cc *CloudConfig) findUser(user string) *User {
+	for i, u := range cc.Users {
+		if u.Name == user {
+			return &cc.Users[i]
+		}
+	}
+	return nil
+}
+
 func (cc CloudConfig) String() string {
 	bytes, err := yaml.Marshal(cc)
 	if err != nil {
